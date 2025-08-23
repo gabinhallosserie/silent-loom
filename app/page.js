@@ -1,103 +1,107 @@
-import Image from "next/image";
+"use client";
+
+import {useEffect, useMemo, useState} from "react";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    const [loading, setLoading] = useState(true);
+    const [withSizes, setWithSizes] = useState(true);
+    const [projects, setProjects] = useState([]);
+    const [filter, setFilter] = useState("");
+    const [busy, setBusy] = useState(null);
+    const [error, setError] = useState(null);
+    const [base, setBase] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+    async function load() {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/projects?withSizes=${withSizes ? "1" : "0"}`);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Erreur API");
+            setBase(json.base);
+            setProjects(json.projects);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        load();
+    }, [withSizes]);
+
+    const filtered = useMemo(() => {
+        const q = filter.trim().toLowerCase();
+        return projects
+            .filter((p) => p.name.toLowerCase().includes(q))
+            .sort((a, b) => b.nodeModulesBytes - a.nodeModulesBytes);
+    }, [projects, filter]);
+
+    async function clean(name) {
+        setBusy(name);
+        setError(null);
+        try {
+            const res = await fetch("/api/clean", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({projectName: name}),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Échec suppression");
+            await load();
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setBusy(null);
+        }
+    }
+
+    return (
+        <main className="w-full h-screen p-6">
+            <div className="w-5xl mx-auto space-y-6">
+                <header className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm text-zinc-400">Folder source: {base || "…"}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer par nom…" className="px-3 py-2 rounded-lg border text-[#323232] bg-white border-zinc-800 text-sm outline-none focus:outline-none focus:border-zinc-700"/>
+                        <button onClick={load} disabled={loading} className="px-3 py-2 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 text-sm">
+                            {loading ? <i className='bi bi-arrow-clockwise text-white'></i> : <i className='bi bi-arrow-clockwise'></i>}
+                        </button>
+                    </div>
+                </header>
+
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filtered.map((p) => (
+                        <li key={p.path} className="p-4 rounded-xl bg-white border">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="font-medium">{p.name}</div>
+                                    <div className="text-xs text-[#323232] break-all">{p.path}</div>
+                                    <div className="mt-1 text-xs text-zinc-400">
+                                        {p.nodeModulesBytes > 0 ? (
+                                            <span>node_modules :{" "} ≈ {" "} {new Intl.NumberFormat().format(Math.round(p.nodeModulesBytes / (1024 * 1024)))}{" "} MB</span>
+                                        ) : (
+                                            <span>node_modules :{" "} ≈ {" "} {new Intl.NumberFormat().format(Math.round(p.nodeModulesBytes / (1024 * 1024)))}{" "} MB</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <button disabled={busy === p.name} onClick={() => clean(p.name)} className="px-3 py-2 rounded-lg bg-[#ea377e] hover:bg-[#c22d67] text-white disabled:opacity-50 text-sm">
+                                    {busy === p.name ? "Nettoyage…" : <i className="bi bi-trash"></i>}
+                                </button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+
+                {!loading && filtered.length === 0 && (
+                    <div className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
+                        Aucun projet trouvé.
+                    </div>
+                )}
+            </div>
+        </main>
+    );
 }
