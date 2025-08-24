@@ -10,6 +10,7 @@ export default function Home() {
     const [busy, setBusy] = useState(null);
     const [error, setError] = useState(null);
     const [base, setBase] = useState("");
+    const [filterDirWithoutNodeModules, setFilterDirWithoutNodeModules] = useState(false);
 
     async function load() {
         setLoading(true);
@@ -27,16 +28,29 @@ export default function Home() {
         }
     }
 
+    const toggleFilterDirWithoutNodeModules = () => {
+        setFilterDirWithoutNodeModules(!filterDirWithoutNodeModules);
+        load();
+    }
+
     useEffect(() => {
         load();
     }, [withSizes]);
 
     const filtered = useMemo(() => {
         const q = filter.trim().toLowerCase();
-        return projects
-            .filter((p) => p.name.toLowerCase().includes(q))
-            .sort((a, b) => b.nodeModulesBytes - a.nodeModulesBytes);
+        if (filterDirWithoutNodeModules) {
+            return projects
+                .filter((p) => p.name.toLowerCase().includes(q))
+                .filter((p) => p.nodeModulesBytes > 0)
+                .sort((a, b) => b.nodeModulesBytes - a.nodeModulesBytes);
+        } else {
+            return projects
+                .filter((p) => p.name.toLowerCase().includes(q))
+                .sort((a, b) => b.nodeModulesBytes - a.nodeModulesBytes);
+        }
     }, [projects, filter]);
+
 
     async function clean(name) {
         setBusy(name);
@@ -67,9 +81,11 @@ export default function Home() {
 
                     <div className="flex items-center gap-3">
                         <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer par nom…" className="px-3 py-2 rounded-lg border text-[#323232] bg-white border-zinc-800 text-sm outline-none focus:outline-none focus:border-zinc-700"/>
-                        <button onClick={load} disabled={loading} className="px-3 py-2 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-50 text-sm">
-                            {loading ? <i className='bi bi-arrow-clockwise text-white'></i> : <i className='bi bi-arrow-clockwise'></i>}
+                        <button onClick={toggleFilterDirWithoutNodeModules
+                        } className="px-3 py-2 rounded-lg bg-gray-100">
+                            {filterDirWithoutNodeModules ? <i title={"Les dossiers sont filtrés"} className="bi bi-ban"></i> : <i title={"Tous les dossiers sont affichés"} className="bi bi-check-all"></i>}
                         </button>
+                        <span className="w-[100px] text-right text-sm text-zinc-400">{loading ? "Chargement..." : `${filtered.length} projet${filtered.length > 1 ? "s" : ""}`}</span>
                     </div>
                 </header>
 
