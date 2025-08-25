@@ -84,7 +84,7 @@ export default function Home() {
     console.log(projects);
 
     return (
-        <div className="w-9/12 mt-10 flex flex-col justify-center items-start">
+        <div className="w-9/12 mt-10 flex flex-col justify-center items-start overflow-scroll">
             <div className="w-full flex justify-between items-center">
                 <div className={"flex justify-start items-center gap-4"}>
                     <input type={"text"} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by name…" className={"px-2 py-1 border border-gray-300 rounded-xl outline-none"}/>
