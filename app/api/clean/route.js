@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export async function POST(req) {
     try {
         const base = process.env.BASE_PROJECTS_PATH;
-        if (!base) throw new Error("BASE_PROJECTS_PATH non défini.");
+        if (!base) throw new Error("BASE_PROJECTS_PATH non défini dans .env.local");
 
         const body = await req.json();
         const { projectName } = body;
