@@ -1,8 +1,8 @@
 import { Poppins } from "next/font/google";
+import NavMenu from "@/components/NavMenu";
+
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "./globals.css";
-
-import SideMenu from "@/components/SideMenu";
 
 const globalNextFont = Poppins({
     subsets: ["latin"],
@@ -17,13 +17,11 @@ export const metadata = {
 export default function RootLayout({children}) {
     return (
         <html lang="fr">
-            <body className={`${globalNextFont.className} antialiased`}>
-            <div className={"w-screen min-h-screen flex items-start justify-between bg-white px-10 py-5"}>
-                <div className={"w-[400px]"}>
-                    <SideMenu />
+            <body className={`${globalNextFont.className} antialiased my-5`}>
+                <div className={"flex flex-col items-center justify-center"}>
+                    <NavMenu />
+                    {children}
                 </div>
-                {children}
-            </div>
             </body>
         </html>
     );

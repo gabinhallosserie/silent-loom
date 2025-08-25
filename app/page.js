@@ -12,6 +12,17 @@ export default function Home() {
     const [base, setBase] = useState("");
     const [filterDirWithoutNodeModules, setFilterDirWithoutNodeModules] = useState(false);
 
+    function formatProjectName(name) {
+        return name
+            .replace(/-/g, " ")
+            .split(" ")
+            .map(word => {
+                if (word.toLowerCase() === "api") return "API";
+                return word.charAt(0).toUpperCase() + word.slice(1);
+            })
+            .join(" ");
+    }
+
     async function load() {
         setLoading(true);
         setError(null);
@@ -51,7 +62,6 @@ export default function Home() {
         }
     }, [projects, filter]);
 
-
     async function clean(name) {
         setBusy(name);
         setError(null);
@@ -71,53 +81,58 @@ export default function Home() {
         }
     }
 
+    console.log(projects);
+
     return (
-        <main className="w-full h-screen p-6">
-            <div className="w-5xl mx-auto space-y-6">
-                <header className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm text-zinc-400">Folder source: {base || "…"}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <input type="text" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer par nom…" className="px-3 py-2 rounded-lg border text-[#323232] bg-white border-zinc-800 text-sm outline-none focus:outline-none focus:border-zinc-700"/>
-                        <button onClick={toggleFilterDirWithoutNodeModules
-                        } className="px-3 py-2 rounded-lg bg-gray-100">
-                            {filterDirWithoutNodeModules ? <i title={"Les dossiers sont filtrés"} className="bi bi-ban"></i> : <i title={"Tous les dossiers sont affichés"} className="bi bi-check-all"></i>}
-                        </button>
-                        <span className="w-[100px] text-right text-sm text-zinc-400">{loading ? "Chargement..." : `${filtered.length} projet${filtered.length > 1 ? "s" : ""}`}</span>
-                    </div>
-                </header>
-
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filtered.map((p) => (
-                        <li key={p.path} className="p-4 rounded-xl bg-white border">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <div className="font-medium">{p.name}</div>
-                                    <div className="text-xs text-[#323232] break-all">{p.path}</div>
-                                    <div className="mt-1 text-xs text-zinc-400">
-                                        {p.nodeModulesBytes > 0 ? (
-                                            <span>node_modules :{" "} ≈ {" "} {new Intl.NumberFormat().format(Math.round(p.nodeModulesBytes / (1024 * 1024)))}{" "} MB</span>
-                                        ) : (
-                                            <span>node_modules :{" "} ≈ {" "} {new Intl.NumberFormat().format(Math.round(p.nodeModulesBytes / (1024 * 1024)))}{" "} MB</span>
-                                        )}
-                                    </div>
-                                </div>
-                                <button disabled={busy === p.name} onClick={() => clean(p.name)} className="px-3 py-2 rounded-lg bg-[#ea377e] hover:bg-[#c22d67] text-white disabled:opacity-50 text-sm">
-                                    {busy === p.name ? "Nettoyage…" : <i className="bi bi-trash"></i>}
-                                </button>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-
-                {!loading && filtered.length === 0 && (
-                    <div className="p-6 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400">
-                        Aucun projet trouvé.
-                    </div>
-                )}
+        <div className="w-9/12 mt-10 flex flex-col justify-center items-start">
+            <div className="w-full flex justify-between items-center">
+                <div className={"flex justify-start items-center gap-4"}>
+                    <input type={"text"} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter by name…" className={"px-2 py-1 border border-gray-300 rounded-xl outline-none"}/>
+                    <button onClick={toggleFilterDirWithoutNodeModules} className="px-2 py-1 rounded-lg bg-gray-100">
+                        {filterDirWithoutNodeModules ? <i title={"The files are filtered"} className="bi bi-funnel-fill"></i> : <i title={"All folders are displayed"} className="bi bi-funnel"></i>}
+                    </button>
+                </div>
+                <span className="w-[100px] text-right text-sm text-zinc-400">{loading ? "Loading..." : `${filtered.length} projet${filtered.length > 1 ? "s" : ""}`}</span>
             </div>
-        </main>
+
+            <div className={"grid w-full grid-cols-1 md:grid-cols-2 gap-4 mt-4"}>
+                {projects.map((p) => {
+                    const isFiltered = !p.name.toLowerCase().includes(filter.trim().toLowerCase());
+                    if (filterDirWithoutNodeModules && p.nodeModulesBytes === 0) return null;
+                    return (
+                        <div key={p.name} className={`flex flex-col justify-between p-4 border border-gray-300 rounded-lg bg-white ${isFiltered ? "hidden" : ""}`}>
+                            <div className={"flex flex-col justify-start items-start"}>
+                                <h2 className="text-lg font-semibold -mb-1"><i className={"bi bi-folder"}></i> {formatProjectName(p.name)}</h2>
+                                <p className="text-xs text-gray-600 mb-5">{p.path}</p>
+                            </div>
+                            <div className={"flex justify-between items-center"}>
+                                <div className={"flex justify-start items-center gap-2"}>
+                                    {withSizes && (
+                                        <p>
+                                            {p.nodeModulesBytes > 0 ? (
+                                                <span className="w-full text-sm bg-gray-100 p-2 rounded font-mono tracking-tighter">{(p.nodeModulesBytes / (1024 * 1024)).toFixed(2)}MB</span>
+                                            ) : (
+                                                <></>
+                                            )}
+                                        </p>
+                                    )}
+                                    {p.nodeModulesBytes !== 0 && (
+                                        <button title={"Delete node_modules"} onClick={() => clean(p.name)} disabled={busy !== null} className="px-3 py-1 bg-[#f79cbe] hover:bg-[#ea377e] text-white rounded disabled:opacity-50">
+                                            {busy === p.name ? "Deleting..." : <i className="bi bi-trash"></i>}
+                                        </button>
+                                    )}
+                                </div>
+                                <div>
+                                    <button title={"View dependencies"} className="px-3 py-1 bg-[#2563eb] text-white rounded">
+                                        <i className="bi bi-diagram-3"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })
+                }
+            </div>
+        </div>
     );
 }
