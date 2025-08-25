@@ -1,15 +1,14 @@
 import path from "path";
+import fs from "fs";
 import { NextResponse } from "next/server";
 import { listDirectories, resolveSafe, dirSizeBytes } from "@/lib/fs";
-import fs from "fs";
-import { getBasePath } from "@/lib/config";
 
 export const runtime = "nodejs";
 
 export async function GET(req) {
     try {
-        const base = getBasePath();
-        if (!base) throw new Error("BASE_PROJECTS_PATH non défini dans config");
+        const base = process.env.BASE_PROJECTS_PATH;
+        if (!base) throw new Error("BASE_PROJECTS_PATH non défini dans .env.local");
 
         const { searchParams } = new URL(req.url);
         const withSizes = searchParams.get("withSizes") === "1";

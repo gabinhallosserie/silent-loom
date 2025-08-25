@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { resolveSafe, removeNodeModules } from "@/lib/fs";
-import { getBasePath } from "@/lib/config";
 
 export const runtime = "nodejs";
 
 export async function POST(req) {
     try {
-        const base = getBasePath();
-        if (!base) throw new Error("BASE_PROJECTS_PATH non défini dans config");
+        const base = process.env.BASE_PROJECTS_PATH;
+        if (!base) throw new Error("BASE_PROJECTS_PATH non défini dans .env.local");
 
         const body = await req.json();
         const { projectName } = body;
