@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {useEffect, useMemo, useState} from "react";
+import PageHeader from "@/components/PageHeader";
+import Card from "@/components/Card";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
 
 export default function ProjectsPage() {
     const [loading, setLoading] = useState(true);
     const [withSizes, setWithSizes] = useState(true);
     const [projects, setProjects] = useState([]);
     const [filter, setFilter] = useState("");
-    const [filterDirWithoutNodeModules, setFilterDirWithoutNodeModules] =
-        useState(false);
+    const [onlyWithNodeModules, setOnlyWithNodeModules] = useState(false);
     const [busy, setBusy] = useState(null);
     const [error, setError] = useState(null);
+
+    const [toast, setToast] = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState(null);
+    const [depsModal, setDepsModal] = useState(null);
 
     async function load() {
         setLoading(true);
@@ -35,52 +42,45 @@ export default function ProjectsPage() {
         const q = filter.trim().toLowerCase();
         return projects
             .filter((p) => p.name.toLowerCase().includes(q))
-            .filter((p) => (filterDirWithoutNodeModules ? p.nodeModulesBytes > 0 : true))
+            .filter((p) => (onlyWithNodeModules ? p.nodeModulesBytes > 0 : true))
             .sort((a, b) => b.nodeModulesBytes - a.nodeModulesBytes);
-    }, [projects, filter, filterDirWithoutNodeModules]);
+    }, [projects, filter, onlyWithNodeModules]);
 
     async function clean(name) {
         setBusy(name);
         try {
             const res = await fetch("/api/clean", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ projectName: name }),
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({projectName: name}),
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "Échec suppression");
+            setToast({message: `node_modules supprimé pour ${name}`, type: "info"});
             await load();
         } catch (e) {
-            setError(e.message);
+            setToast({message: e.message, type: "error"});
         } finally {
             setBusy(null);
+            setConfirmDelete(null);
         }
     }
 
     const formatProjectName = (name) =>
-        name
-            .replace(/-/g, " ")
+        name.replace(/-/g, " ")
             .split(" ")
-            .map((word) => (word.toLowerCase() === "api" ? "API" : word.charAt(0).toUpperCase() + word.slice(1)))
+            .map((w) => (w.toLowerCase() === "api" ? "API" : w.charAt(0).toUpperCase() + w.slice(1)))
             .join(" ");
 
     return (
-        <div className="w-9/12 mt-10 flex flex-col gap-6">
-            <header className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-                    <p className="text-sm text-zinc-500">Browse your projects and manage dependencies</p>
-                </div>
-                <span className="text-sm text-zinc-400">
-          {loading ? "Loading…" : `${filtered.length} project${filtered.length > 1 ? "s" : ""}`}
-        </span>
-            </header>
+        <div className="space-y-6">
+            <PageHeader title="Projects" subtitle="Browse your projects and manage dependencies"/>
 
             {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">{error}</div>
+                <div className="p-3 rounded-lg bg-gray-100 border border-gray-300 text-black">{error}</div>
             )}
 
-            {/* Toolbar */}
+            {/* Toolbar (B&W) */}
             <div className="flex items-center gap-3">
                 <input
                     type="text"
@@ -90,19 +90,18 @@ export default function ProjectsPage() {
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1"
                 />
                 <button
-                    onClick={() => setFilterDirWithoutNodeModules((v) => !v)}
+                    onClick={() => setOnlyWithNodeModules((v) => !v)}
                     className={`px-3 py-2 rounded-lg border text-sm ${
-                        filterDirWithoutNodeModules
-                            ? "bg-zinc-900 text-white border-zinc-900"
-                            : "bg-white text-zinc-700 border-zinc-300"
+                        onlyWithNodeModules ? "bg-black text-white border-black" : "bg-white text-black border-gray-300"
                     }`}
-                    title={filterDirWithoutNodeModules ? "Filter active" : "Show all"}
+                    title={onlyWithNodeModules ? "Filter active" : "Show all"}
                 >
-                    <i className={`bi ${filterDirWithoutNodeModules ? "bi-funnel-fill" : "bi-funnel"}`} />
+                    <i className={`bi ${onlyWithNodeModules ? "bi-funnel-fill" : "bi-funnel"}`}/>
                 </button>
                 <button
                     onClick={load}
                     className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm hover:bg-gray-50"
+                    title="Refresh"
                 >
                     <i className="bi bi-arrow-clockwise"></i>
                 </button>
@@ -111,46 +110,115 @@ export default function ProjectsPage() {
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filtered.map((p) => (
-                    <div
-                        key={p.name}
-                        className="flex flex-col justify-between p-4 rounded-xl border border-gray-200 bg-white shadow-sm"
-                    >
-                        <div>
-                            <h2 className="text-lg font-semibold flex items-center gap-2">
-                                <i className="bi bi-folder2"></i>
-                                {formatProjectName(p.name)}
-                            </h2>
-                            <p className="text-xs text-gray-500 mb-3 break-all">{p.path}</p>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                {p.nodeModulesBytes > 0 && withSizes && (
-                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                    {(p.nodeModulesBytes / (1024 * 1024)).toFixed(2)} MB
-                  </span>
-                                )}
-                                {p.nodeModulesBytes > 0 && (
-                                    <button
-                                        onClick={() => clean(p.name)}
-                                        disabled={busy !== null}
-                                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded disabled:opacity-50"
-                                    >
-                                        {busy === p.name ? "Deleting…" : <i className="bi bi-trash"></i>}
-                                    </button>
-                                )}
+                    <Card key={p.name}>
+                        <div className="flex flex-col justify-between h-full">
+                            <div>
+                                <h2 className="text-lg font-semibold flex items-center gap-2">
+                                    <i className="bi bi-folder2"></i>
+                                    {formatProjectName(p.name)}
+                                </h2>
+                                <p className="text-xs text-gray-500 mb-3 break-all">{p.path}</p>
                             </div>
-                            <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded">
-                                <i className="bi bi-diagram-3"></i>
-                            </button>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    {p.nodeModulesBytes > 0 && withSizes && (
+                                        <span className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
+                      {(p.nodeModulesBytes / (1024 * 1024)).toFixed(2)} MB
+                    </span>
+                                    )}
+                                    {p.nodeModulesBytes > 0 && (
+                                        <button
+                                            onClick={() => setConfirmDelete(p.name)}
+                                            disabled={busy !== null}
+                                            className="px-3 py-1 bg-black text-white text-sm rounded disabled:opacity-50"
+                                            title="Delete node_modules"
+                                        >
+                                            <i className="bi bi-trash"></i>
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setDepsModal(p)}
+                                    className="px-3 py-1 bg-black text-white text-sm rounded"
+                                    title="View dependencies"
+                                >
+                                    <i className="bi bi-diagram-3"></i>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </Card>
                 ))}
-                {filtered.length === 0 && !loading && (
-                    <div className="col-span-full text-center text-zinc-500 py-16">
-                        No projects found.
-                    </div>
-                )}
             </div>
+
+            {/* Confirm delete modal (B&W) */}
+            <Modal
+                open={!!confirmDelete}
+                title="Confirm deletion"
+                onClose={() => setConfirmDelete(null)}
+            >
+                <p className="text-sm text-gray-600 mb-4">
+                    Delete <code>{confirmDelete}</code> node_modules?
+                </p>
+                <div className="flex justify-end gap-2">
+                    <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-3 py-1 rounded border border-gray-300 text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => clean(confirmDelete)}
+                        className="px-3 py-1 rounded bg-black text-white text-sm"
+                    >
+                        Confirm
+                    </button>
+                </div>
+            </Modal>
+
+            {/* Dependencies modal (B&W) */}
+            <Modal
+                open={!!depsModal}
+                title={`Dependencies for ${depsModal?.name}`}
+                onClose={() => setDepsModal(null)}
+            >
+                <div className="grid grid-cols-2 gap-6 text-sm">
+                    <div>
+                        <h4 className="font-semibold mb-1">Dependencies</h4>
+                        <ul className="space-y-1">
+                            {Object.entries(depsModal?.dependencies || {}).map(([dep, ver]) => (
+                                <li key={dep}>
+                                    {dep} <span className="text-gray-500">{ver}</span>
+                                </li>
+                            ))}
+                            {Object.keys(depsModal?.dependencies || {}).length === 0 && (
+                                <li className="text-gray-400">None</li>
+                            )}
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold mb-1">DevDependencies</h4>
+                        <ul className="space-y-1">
+                            {Object.entries(depsModal?.devDependencies || {}).map(([dep, ver]) => (
+                                <li key={dep}>
+                                    {dep} <span className="text-gray-500">{ver}</span>
+                                </li>
+                            ))}
+                            {Object.keys(depsModal?.devDependencies || {}).length === 0 && (
+                                <li className="text-gray-400">None</li>
+                            )}
+                        </ul>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Toast (B&W) */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type="info"
+                    onClose={() => setToast(null)}
+                />
+            )}
         </div>
     );
 }
