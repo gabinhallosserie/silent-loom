@@ -18,6 +18,8 @@ export default function ProjectsPage() {
     const [toast, setToast] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [depsModal, setDepsModal] = useState(null);
+    const [outdated, setOutdated] = useState({});
+    const [checkingOutdated, setCheckingOutdated] = useState(false);
 
     async function load() {
         setLoading(true);
@@ -37,6 +39,19 @@ export default function ProjectsPage() {
     useEffect(() => {
         load();
     }, [withSizes]);
+
+    useEffect(() => {
+        if (depsModal) {
+            setCheckingOutdated(true);
+            fetch(`/api/outdated?project=${encodeURIComponent(depsModal.name)}`)
+                .then((res) => res.json())
+                .then((json) => setOutdated(json.outdated || {}))
+                .catch(() => setOutdated({}))
+                .finally(() => setCheckingOutdated(false));
+        } else {
+            setOutdated({});
+        }
+    }, [depsModal]);
 
     const filtered = useMemo(() => {
         const q = filter.trim().toLowerCase();
@@ -71,6 +86,34 @@ export default function ProjectsPage() {
             .split(" ")
             .map((w) => (w.toLowerCase() === "api" ? "API" : w.charAt(0).toUpperCase() + w.slice(1)))
             .join(" ");
+
+    const renderDeps = (deps) => (
+        <ul className="space-y-1">
+            {Object.entries(deps || {}).map(([dep, ver]) => (
+                <li key={dep} className="flex items-center justify-between">
+                    <span>
+                        {dep} <span className="text-gray-500">{ver}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                        {outdated[dep] && (
+                            <span className="text-red-600 text-xs">{outdated[dep].latest}</span>
+                        )}
+                        <a
+                            href={`https://www.npmjs.com/package/${dep}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-500"
+                        >
+                            <i className="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    </div>
+                </li>
+            ))}
+            {Object.keys(deps || {}).length === 0 && (
+                <li className="text-gray-400">None</li>
+            )}
+        </ul>
+    );
 
     return (
         <div className="space-y-6">
@@ -181,32 +224,17 @@ export default function ProjectsPage() {
                 title={`Dependencies for ${depsModal?.name}`}
                 onClose={() => setDepsModal(null)}
             >
+                {checkingOutdated && (
+                    <p className="text-xs text-gray-500 mb-2">Checking updates…</p>
+                )}
                 <div className="grid grid-cols-2 gap-6 text-sm">
                     <div>
                         <h4 className="font-semibold mb-1">Dependencies</h4>
-                        <ul className="space-y-1">
-                            {Object.entries(depsModal?.dependencies || {}).map(([dep, ver]) => (
-                                <li key={dep}>
-                                    {dep} <span className="text-gray-500">{ver}</span>
-                                </li>
-                            ))}
-                            {Object.keys(depsModal?.dependencies || {}).length === 0 && (
-                                <li className="text-gray-400">None</li>
-                            )}
-                        </ul>
+                        {renderDeps(depsModal?.dependencies)}
                     </div>
                     <div>
                         <h4 className="font-semibold mb-1">DevDependencies</h4>
-                        <ul className="space-y-1">
-                            {Object.entries(depsModal?.devDependencies || {}).map(([dep, ver]) => (
-                                <li key={dep}>
-                                    {dep} <span className="text-gray-500">{ver}</span>
-                                </li>
-                            ))}
-                            {Object.keys(depsModal?.devDependencies || {}).length === 0 && (
-                                <li className="text-gray-400">None</li>
-                            )}
-                        </ul>
+                        {renderDeps(depsModal?.devDependencies)}
                     </div>
                 </div>
             </Modal>
